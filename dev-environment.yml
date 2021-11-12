@@ -1,0 +1,5 @@
+name: fasthdl-dev
+channels:
+    - conda-forge
+dependencies:
+    - pip
