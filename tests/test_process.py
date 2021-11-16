@@ -1,10 +1,10 @@
-from fasthdl import module, Reg
+from fasthdl import module, Reg, X
 
 
 def test_process(capfd):
     @module
     def counter(r=Reg()):
-        if r.q is None:
+        if r.q is X:
             r.d = 0
         else:
             r.d = r.q + 1

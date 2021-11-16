@@ -1,3 +1,4 @@
+from fasthdl import X
 from designs.design0 import top_module, reset
 
 
@@ -6,7 +7,7 @@ def test_design0():
 
     reset.d = 1
     m.run()
-    assert m.m1.out0.d is None
+    assert m.m1.out0.d is X
     reset.d = 0
     for i in range(10):
         m.run()

@@ -1,35 +1,172 @@
 import inspect
-from typing import Any, Optional
+from typing import Any, Callable, List, Optional, Generator
+
+
+class _X:
+    def __eq__(self, other):
+        return False
+
+    def __neq__(self, other):
+        return False
+
+    def __repr__(self):
+        return "X"
+
+    # unary operators
+    def __neg__(self):
+        return X
+
+    def __pos__(self):
+        return X
+
+    def __abs__(self):
+        return X
+
+    def __invert__(self):
+        return X
+
+    def __complex__(self):
+        return X
+
+    def __int__(self):
+        return X
+
+    def __float__(self):
+        return X
+
+    def __round__(self):
+        return X
+
+    def __trunc__(self):
+        return X
+
+    def __floor__(self):
+        return X
+
+    def __ceil__(self):
+        return X
+
+    # binary operators
+    def __add__(self, other):
+        return X
+
+    def __radd__(self, other):
+        return X
+
+    def __sub__(self, other):
+        return X
+
+    def __rsub__(self, other):
+        return X
+
+    def __mul__(self, other):
+        return X
+
+    def __rmul__(self, other):
+        return X
+
+    def __matmul__(self, other):
+        return X
+
+    def __rmatmul__(self, other):
+        return X
+
+    def __truediv__(self, other):
+        return X
+
+    def __rtruediv__(self, other):
+        return X
+
+    def __floordiv__(self, other):
+        return X
+
+    def __rfloordiv__(self, other):
+        return X
+
+    def __mod__(self, other):
+        return X
+
+    def __rmod__(self, other):
+        return X
+
+    def __divmod__(self, other):
+        return X
+
+    def __rdivmod__(self, other):
+        return X
+
+    def __pow__(self, other):
+        return X
+
+    def __rpow__(self, other):
+        return X
+
+    def __lshift__(self, other):
+        return X
+
+    def __rlshift__(self, other):
+        return X
+
+    def __rshift__(self, other):
+        return X
+
+    def __rrshift__(self, other):
+        return X
+
+    def __and__(self, other):
+        return X
+
+    def __rand__(self, other):
+        return X
+
+    def __or__(self, other):
+        return X
+
+    def __ror__(self, other):
+        return X
+
+    def __xor__(self, other):
+        return X
+
+    def __rxor__(self, other):
+        return X
+
+
+X = _X()
 
 
 class Wire:
 
     d: Any
-    name: Optional[str]
-    driver: Optional["Module"]
+    _name: Optional[str]
+    _driver: Optional["Module"]
 
     def __init__(self, name: Optional[str] = None):
-        self.d = None
-        self.name = name
-        self.driver = None
+        self.d = X
+        self._name = name
+        self._driver = None
 
-    def compute(self) -> bool:
+    def _compute(self) -> bool:
         """Compute the wire's value.
         Returns `True` if a computation was effectively triggered (and the value may have changed),
         `False` otherwise.
         """
         recomputed = False
-        if self.driver:
-            recomputed = self.driver.compute()
+        if self._driver:
+            recomputed = self._driver._compute()
         return recomputed
 
 
 class Reg:
 
-    d: Any = None
-    q: Any = None
+    d: Any
+    q: Any
 
-    def tick(self):
+    def __init__(self):
+        self.d = X
+        self.q = X
+
+    def _tick(self):
         self.q = self.d
 
 
@@ -77,14 +214,14 @@ class Resources:
 
         for m1 in self.modules.values():
             for m2 in [m for m in self.modules.values() if m != m1]:
-                p2 = [p for p in m2.resources.ports.values() if isinstance(p, str)]
+                p2 = [p for p in m2._resources.ports.values() if isinstance(p, str)]
                 for p1 in [
-                    p for p in m1.resources.ports.values() if isinstance(p, str)
+                    p for p in m1._resources.ports.values() if isinstance(p, str)
                 ]:
                     if p1 in p2:
                         w = Wire(name=p1)
-                        m1.resources.set_arg(p1, w)
-                        m2.resources.set_arg(p1, w)
+                        m1._resources.set_arg(p1, w)
+                        m2._resources.set_arg(p1, w)
 
     def update_ports(self):
         self.inputs = {
@@ -99,7 +236,7 @@ class Resources:
         }
         self.ports = dict(self.inputs, **self.outputs)
         for output in [o for o in self.outputs.values() if not isinstance(o, str)]:
-            output.driver = self.module
+            output._driver = self.module
 
     def set_arg(self, name, value):
         if name in self._args.values():
@@ -128,56 +265,64 @@ class Resources:
 
 class Module:
 
-    cycle_i: int
+    _func: Callable
+    _resources: Resources
+    _computed: bool
+    _cycle_i: int
+    _processes: List[Generator[None, None, None]]
 
     def __init__(self, func, args, kwargs):
-        self.func = func
-        self.resources = Resources(func, args, kwargs, self)
-        self.computed = False
-        self.cycle_i = 0
-        self.processes = []
+        self._func = func
+        self._resources = Resources(func, args, kwargs, self)
+        self._computed = False
+        self._cycle_i = 0
+        self._processes = []
+
+    @property
+    def cycle_i(self):
+        return self._cycle_i
 
     def run(self, cycle_nb=1):
-        for i in range(cycle_nb):
-            for process in self.processes:
+        for _ in range(cycle_nb):
+            for process in self._processes:
                 try:
                     next(process)
                 except StopIteration:
-                    self.processes.remove(process)
-            self.compute()
-            self.tick()
-            self.cycle_i += 1
+                    self._processes.remove(process)
+            self._compute()
+            self._tick()
+            self._cycle_i += 1
 
-    def compute(self) -> bool:
+    def _compute(self) -> bool:
         recomputed = False
-        inputs_changed = any(i.compute() for i in self.resources.inputs.values())
-        do_compute = not self.computed or inputs_changed
+        inputs_changed = any(i._compute() for i in self._resources.inputs.values())
+        do_compute = not self._computed or inputs_changed
         if do_compute:
-            self.func(*self.resources.args, **self.resources.kwargs)
-            self.computed = True
+            self._func(*self._resources.args, **self._resources.kwargs)
+            self._computed = True
             recomputed = True
-        for m in self.resources.modules.values():
-            m.compute()
+        for m in self._resources.modules.values():
+            m._compute()
         return recomputed
 
-    def tick(self):
-        for m in self.resources.modules.values():
-            m.tick()
-        for r in self.resources.registers.values():
-            r.tick()
-        self.computed = False
+    def _tick(self):
+        for m in self._resources.modules.values():
+            m._tick()
+        for r in self._resources.registers.values():
+            r._tick()
+        self._computed = False
 
     def attach(self, process):
-        self.processes.append(process)
+        self._processes.append(process)
 
     def __getitem__(self, name):
-        return self.resources[name]
+        return self._resources[name]
 
     def __getattribute__(self, name: str) -> Any:
         try:
             return super().__getattribute__(name)
         except AttributeError:
-            return super().__getattribute__("resources")[name]
+            return super().__getattribute__("_resources")[name]
 
 
 def module(func):

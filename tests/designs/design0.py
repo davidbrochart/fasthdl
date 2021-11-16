@@ -7,10 +7,7 @@ def sub_module0(
     in0: In,
     out0: Out,
 ):
-    if in0.d is None:
-        out0.d = None
-    else:
-        out0.d = 2 * in0.d
+    out0.d = 2 * in0.d
 
 
 @module
@@ -23,7 +20,7 @@ def sub_module1(
 ):
     if reset.d == 1:
         reg0.d = 0
-    elif reg0.q is not None:
+    else:
         reg0.d = reg0.q + 1
     out0.d = reg0.q
 
