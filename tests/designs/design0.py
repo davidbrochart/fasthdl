@@ -23,7 +23,7 @@ def sub_module1(
 ):
     if reset.d == 1:
         reg0.d = 0
-    else:
+    elif reg0.q is not None:
         reg0.d = reg0.q + 1
     out0.d = reg0.q
 

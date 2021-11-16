@@ -1,21 +1,26 @@
-import asyncio
 import inspect
 from typing import Any, Optional
 
 
 class Wire:
 
-    d: Any = None
+    d: Any
+    name: Optional[str]
+    driver: Optional["Module"]
 
-    driver: Optional["Module"] = None
-
-    def __init__(self, name=None):
+    def __init__(self, name: Optional[str] = None):
+        self.d = None
         self.name = name
+        self.driver = None
 
-    async def compute(self) -> bool:
+    def compute(self) -> bool:
+        """Compute the wire's value.
+        Returns `True` if a computation was effectively triggered (and the value may have changed),
+        `False` otherwise.
+        """
         recomputed = False
         if self.driver:
-            recomputed = await self.driver.compute()
+            recomputed = self.driver.compute()
         return recomputed
 
 
@@ -24,7 +29,7 @@ class Reg:
     d: Any = None
     q: Any = None
 
-    def clock(self):
+    def tick(self):
         self.q = self.d
 
 
@@ -122,36 +127,48 @@ class Resources:
 
 
 class Module:
+
+    cycle_i: int
+
     def __init__(self, func, args, kwargs):
         self.func = func
         self.resources = Resources(func, args, kwargs, self)
         self.computed = False
+        self.cycle_i = 0
+        self.processes = []
 
-    async def run(self, clocks=1):
-        for i in range(clocks):
-            self.clock()
-            await self.compute()
+    def run(self, cycle_nb=1):
+        for i in range(cycle_nb):
+            for process in self.processes:
+                try:
+                    next(process)
+                except StopIteration:
+                    self.processes.remove(process)
+            self.compute()
+            self.tick()
+            self.cycle_i += 1
 
-    async def compute(self) -> bool:
+    def compute(self) -> bool:
         recomputed = False
-        inputs_changed = any(
-            await asyncio.gather(*(i.compute() for i in self.resources.inputs.values()))
-        )
+        inputs_changed = any(i.compute() for i in self.resources.inputs.values())
         do_compute = not self.computed or inputs_changed
         if do_compute:
             self.func(*self.resources.args, **self.resources.kwargs)
             self.computed = True
             recomputed = True
         for m in self.resources.modules.values():
-            await m.compute()
+            m.compute()
         return recomputed
 
-    def clock(self):
+    def tick(self):
         for m in self.resources.modules.values():
-            m.clock()
+            m.tick()
         for r in self.resources.registers.values():
-            r.clock()
+            r.tick()
         self.computed = False
+
+    def attach(self, process):
+        self.processes.append(process)
 
     def __getitem__(self, name):
         return self.resources[name]
